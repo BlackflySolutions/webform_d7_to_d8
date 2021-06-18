@@ -7,6 +7,7 @@ use Drupal\webform_d7_to_d8\Collection\Components;
 use Drupal\webform_d7_to_d8\Collection\Submissions;
 use Drupal\webform\Entity\Webform as DrupalWebform;
 use Drupal\webform\Entity\WebformSubmission;
+use Drupal\node\Entity\Node;
 
 /**
  * Represents a webform.
@@ -127,7 +128,7 @@ class Webform {
         WebformMigrator::instance()->addError($t->getMessage());
       }
     }
-    $node = node_load($this->getNid());
+    $node = Node::load($this->getNid());
     if (isset($this->options['simulate']) && $this->options['simulate']) {
       $this->print('SIMULATE: Linking node to the webform we just created.');
     }
@@ -195,16 +196,47 @@ class Webform {
     $query->addField('wc', 'cid');
     $query->addField('wc', 'form_key');
     $query->addField('wc', 'name');
-    $query->addField('wc', 'required');
+    $query->addField('wc', 'mandatory');
     $query->addField('wc', 'type');
     $query->addField('wc', 'extra');
+    $query->addField('wc', 'value');
     $query->condition('nid', $this->getNid(), '=');
     $query->orderBy('weight');
 
     $result = $query->execute()->fetchAllAssoc('cid');
     $array = [];
     foreach ($result as $cid => $info) {
-      $array[] = ComponentFactory::instance()->create($this, $cid, (array) $info, $this->options);
+      $info = (array) $info;
+      $info['required'] = $info['mandatory'];
+      unset($info['mandatory']);
+
+      $extra_info = unserialize($info['extra']);
+
+      if ($info['type'] == 'markup') {
+        $info['type'] = 'processed_text';
+      }
+      if ($info['type'] == 'select') {
+        // If aslist != 0, change field type to checkbox/radio.
+        if ($extra_info['aslist'] == 0) {
+          // Create options for checkboxes/radios.
+          $options = explode(PHP_EOL, $extra_info['items']);
+          $arrLength = count($options);
+
+          if ($extra_info['multiple'] == 1) {
+            if ($arrLength == 1) {
+              $info['type'] = 'checkbox';
+            }
+            else {
+              $info['type'] = 'checkboxes';
+            }
+          }
+          else {
+            $info['type'] = 'radios';
+          }
+        }
+      }
+
+      $array[] = ComponentFactory::instance()->create($this, $cid, $info, $this->options);
     }
 
     return new Components($array);
