@@ -48,9 +48,84 @@ class Component {
       '#type' => $info['type'],
       '#required' => $info['required'],
       '#default_value' => '',
+      '#title_display' => 'invisible',
     ];
 
+    switch ($info['form_key']) {
+      case 'utm_campaign':
+        $return['#default_value'] = '[current-page:query:utm_campaign:clear]';
+        break;
+      case 'utm_content':
+        $return['#default_value'] = '[current-page:query:utm_content:clear]';
+        break;
+      case 'utm_medium':
+        $return['#default_value'] = '[current-page:query:utm_medium:clear]';
+        break;
+      case 'utm_source':
+        $return['#default_value'] = '[current-page:query:utm_source:clear]';
+        break;
+      case 'utm_term':
+        $return['#default_value'] = '7010B000000sC3p';
+        break;
+      case 'privacy_policy':
+        $return['#required_error'] = 'Privacy policy field is required.';
+        break;
+    }
+    $extra_info = unserialize($info['extra']);
+    if (isset($extra_info['items']) && !empty($extra_info['items'])) {
+      $options = explode(PHP_EOL, $extra_info['items']);
+      $arrLength = count($options);
+      $option_array = array();
+      foreach ($options as $key => $option) {
+        $key_value = explode('|', $option);
+        $option_array[$key_value[0]] = $key_value[1];
+        if ($arrLength == 1) {
+          $checkbox_label = $key_value[1];
+        }
+      }
+    }
+
+    switch ($info['type']) {
+      case 'email':
+        $return['#default_value'] = '[current-user:mail]';
+        break;
+      case 'select':
+        $return['#empty_option'] = $info['name'];
+        break;
+      case 'hidden':
+        if (!empty($info['value'])) {
+          $return['#default_value'] = $info['value'];
+        }
+        break;
+      case 'processed_text':
+        $return['#format'] = 'full_html';
+        $return['#text'] = $info['value'];
+        break;
+      case 'checkboxes':
+        $return['description_display'] = $info['invisible'];
+        if (!empty($checkbox_label)) {
+          $info['description'] = $info['name'] = $checkbox_label;
+        }
+        break;
+      case 'checkbox':
+        $return['#description'] = $info['name'] = $checkbox_label;
+        $return['#description_display'] = $info['invisible'];
+        $return['#options'] = $option_array;
+        break;
+      case 'radios':
+        $return['#description'] = $info['name'];
+        $return['#description_display'] = $info['invisible'];
+        $return['#options'] = $option_array;
+        $return['#title_display'] = 'before';
+        break;
+    }
+
+
     $this->extraInfo($return);
+
+    if ($info['form_key'] == 'gdpr_country') {
+      $return['#options'] = 'country_codes';
+    }
 
     return $return;
   }
