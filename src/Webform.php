@@ -52,7 +52,8 @@ class Webform {
     $result = array_keys($query->execute()->fetchAllAssoc('sid'));
 
     $max = \Drupal::state()->get('webform_d7_to_d8_max_delete_items', 500);
-    $this->print('Will delete @n submissions in chunks of @c to avoid avoid out of memory errors.', ['@n' => count($result), '@c' => $max]);
+    $this->print('Will delete @n submissions in chunks of @c to avoid avoid
+      out of memory errors.', ['@n' => count($result), '@c' => $max]);
 
     $arrays = array_chunk($result, $max);
 
@@ -61,7 +62,8 @@ class Webform {
     $storage = \Drupal::entityTypeManager()->getStorage('webform_submission');
     foreach ($arrays as $array) {
       $submissions = WebformSubmission::loadMultiple($array);
-      $this->print('Deleting @n submissions for webform @f', ['@n' => count($submissions), '@f' => $this->getNid()]);
+      $this->print('Deleting @n submissions for webform @f',
+        ['@n' => count($submissions), '@f' => $this->getNid()]);
       $storage->delete($submissions);
     }
   }
@@ -102,7 +104,7 @@ class Webform {
    *
    * @throws \Exception
    */
-  public function process($options = []) {
+  public function process(array $options = []) {
     $new_only = empty($options['new-only']) ? FALSE : TRUE;
     $continue = TRUE;
     $this->drupalObject = $this->updateD8Webform([
@@ -119,7 +121,8 @@ class Webform {
     }
     $submissions = $this->webformSubmissions()->toArray();
     foreach ($submissions as $submission) {
-      $this->print($this->t('Form @n: Processing submission @s', ['@n' => $this->getNid(), '@s' => $submission->getSid()]));
+      $this->print($this->t('Form @n: Processing submission @s',
+        ['@n' => $this->getNid(), '@s' => $submission->getSid()]));
       try {
         $submission->process();
       }
@@ -145,6 +148,9 @@ class Webform {
     else {
       $this->print('Node @n does not exist on the target environment, moving on...', ['@n' => $this->getNid()]);
     }
+    // Attach email handler.
+    $this->print('Adding Email Handlers associated with this webform....');
+    $this->webformEmailHandlers();
   }
 
   /**
@@ -186,7 +192,7 @@ class Webform {
   /**
    * Get all legacy components for a given webform.
    *
-   * @return Components
+   * @return \Drupal\webform_d7_to_d8\Collection\Components
    *   The components.
    *
    * @throws \Exception
@@ -243,9 +249,112 @@ class Webform {
   }
 
   /**
+   * Get all the email handlers.
+   */
+  public function webformEmailHandlers() {
+    $query = $this->getConnection('upgrade')->select('webform_emails', 'we');
+    $query->fields('we');
+    $query->condition('nid', $this->getNid());
+    $result = $query->execute()->fetchAll();
+
+    $webform = $this->getDrupalObject();
+    // Create instance of webform handler plugin.
+    foreach ($result as $key => $value) {
+      $value = (array) $value;
+      $array = [];
+      $webform_handler_manager = \Drupal::service('plugin.manager.webform.handler');
+      $webform_handler = $webform_handler_manager->createInstance('email');
+      $webform_handler->setConfiguration([
+        'id' => 'email',
+        'label' => 'Email',
+        'handler_id' => $webform->id() . '_email_' . $key,
+        'status' => TRUE,
+        'weight' => 0,
+        'settings' => [
+          'states' => ['completed'],
+          'to_mail' => $this->getEmailFormKey($value['email']),
+          'to_options' => [],
+          'cc_mail' => '',
+          'cc_options' => [],
+          'bcc_mail' => '',
+          'bcc_options' => [],
+          'from_mail' => $value['from_address'] == 'default' ? '_default' : $value['from_address'],
+          'from_options' => [],
+          'from_name' => $value['from_name'] ?? 'default',
+          'subject' => $value['subject'] == 'default' ? '_default' : $this->replaceToken($value['subject'], 'subject'),
+          'body' => $value['template'] == 'default' ? '_default' : $this->replaceToken($value['template']),
+          'excluded_elements' => [],
+          'html' => TRUE,
+          'twig' => TRUE,
+          'attachments' => TRUE,
+          'debug' => 0,
+          'reply_to' => '',
+          'return_path' => '',
+        ],
+      ]);
+
+      $webform->setOriginalId($webform->id());
+      // Add handle to the webform, which triggers another save().
+      $webform->addWebformHandler($webform_handler);
+
+    }
+  }
+
+  /**
+   * Get email id form key if present.
+   *
+   * @param string $cid
+   *   The cid value.
+   *
+   * @return string
+   *   Proper form key for email.
+   */
+  public function getEmailFormKey(string $cid) {
+    $email = $this->getConnection('upgrade')->select('webform_component', 'wc');
+    $email->addField('wc', 'form_key');
+    $email->condition('nid', $this->getNid());
+    $email->condition('cid', $cid);
+    $email_key = $email->execute()->fetchField();
+
+    return $email_key ? '[webform_submission:values:' . $email_key . ':raw]' : $cid;
+  }
+
+  /**
+   * Replace D7 token with existing D8 token.
+   *
+   * @param string $template
+   *   The string containing token.
+   * @param string $type
+   *   The type of attribute of webform.
+   *
+   * @return string
+   *   Template body with updated tokens.
+   */
+  public function replaceToken(string $template, string $type = 'template') {
+    $token_mapping = [
+      'template' => [
+        '%title' => "{{ webform_token('[webform_submission:source-title]', webform_submission) }}",
+      ],
+      'subject' => [
+        '%title' => '[webform_submission:source-title]',
+      ],
+    ];
+    $template = str_replace('%title', $token_mapping[$type]['%title'], $template);
+    // Replace the value token with twig data token.
+    preg_match_all('/%value\[(.+)\]/', $template, $matches);
+    if (array_key_exists(1, $matches)) {
+      foreach ($matches[1] as $key => $value) {
+        $replacement = '{{ data.' . $value . ' }}';
+        $template = str_replace($matches[0][$key], $replacement, $template);
+      }
+    }
+    return $template;
+  }
+
+  /**
    * Get all legacy submissions for a given webform.
    *
-   * @return Submissions
+   * @return \Drupal\webform_d7_to_d8\Collection\Submissions
    *   The submissions.
    *
    * @throws \Exception
