@@ -197,56 +197,128 @@ class Webform {
    *
    * @throws \Exception
    */
-  public function webformComponents() : Components {
-    $query = $this->getConnection('upgrade')->select('webform_component', 'wc');
-    $query->addField('wc', 'cid');
-    $query->addField('wc', 'form_key');
-    $query->addField('wc', 'name');
-    $query->addField('wc', 'mandatory');
-    $query->addField('wc', 'type');
-    $query->addField('wc', 'extra');
-    $query->addField('wc', 'value');
-    $query->condition('nid', $this->getNid(), '=');
-    $query->orderBy('weight');
+   public function webformComponents() : Components {
+     $query = $this->getConnection('upgrade')->select('webform_component', 'wc');
+     $query->addField('wc', 'cid');
+     $query->addField('wc', 'form_key');
+     $query->addField('wc', 'name');
+     $query->addField('wc', 'mandatory');
+     $query->addField('wc', 'type');
+     $query->addField('wc', 'extra');
+     $query->addField('wc', 'value');
+     $query->condition('nid', $this->getNid(), '=');
+     $query->orderBy('weight');
 
-    $result = $query->execute()->fetchAllAssoc('cid');
-    $array = [];
-    foreach ($result as $cid => $info) {
-      $info = (array) $info;
-      $info['required'] = $info['mandatory'];
-      unset($info['mandatory']);
+     $result = $query->execute()->fetchAllAssoc('cid');
 
-      $extra_info = unserialize($info['extra']);
+     $submit_query = $this->getConnection('upgrade')->select('webform', 'w');
+     $submit_query->addField('w', 'submit_text');
+     $submit_query->condition('nid', $this->getNid(), '=');
+     $submit_text = $submit_query->execute()->fetchField();
 
-      if ($info['type'] == 'markup') {
-        $info['type'] = 'processed_text';
-      }
-      if ($info['type'] == 'select') {
-        // If aslist != 0, change field type to checkbox/radio.
-        if ($extra_info['aslist'] == 0) {
-          // Create options for checkboxes/radios.
-          $options = explode(PHP_EOL, $extra_info['items']);
-          $arrLength = count($options);
+     $disclaimer_query = $this->getConnection('upgrade')->select('webform_component', 'wc');
+     $disclaimer_query->addField('wc', 'cid');
+     $disclaimer_query->condition('nid', $this->getNid(), '=');
+     $disclaimer_query->condition('form_key', 'disclaimer_markup', '=');
+     $disclaimer_cid = $disclaimer_query->execute()->fetchField();
 
-          if ($extra_info['multiple'] == 1) {
-            if ($arrLength == 1) {
-              $info['type'] = 'checkbox';
-            }
-            else {
-              $info['type'] = 'checkboxes';
-            }
-          }
-          else {
-            $info['type'] = 'radios';
-          }
-        }
-      }
+     $array = [];
+     $submit_button = [];
+     $submit_button['cid'] = '1000';
+     $submit_button['type'] = 'webform_actions';
+     $submit_button['name'] = 'Submit button(s)';
+     $submit_button['form_key'] = 'actions';
+     $submit_button['value'] = '';
+     if (!empty($submit_text)) {
+       $submit_button['value'] = $submit_text;
+     }
+     $submit_button_obj = (object) $submit_button;
+     $result['1000'] = $submit_button_obj;
 
-      $array[] = ComponentFactory::instance()->create($this, $cid, $info, $this->options);
-    }
+     if (!empty($disclaimer_cid)) {
+       $disclaimer_new = $result[$disclaimer_cid];
+       unset($result[$disclaimer_cid]);
+       $result[$disclaimer_cid] = $disclaimer_new;
+     }
+     $file_obj = (object) array('cid' => '1001', 'type' => 'attachment_url', 'name' => 'Add to schedule', 'form_key' => 'add_to_schedule');
+     $result['1001'] = $file_obj;
 
-    return new Components($array);
-  }
+     foreach ($result as $cid => $info) {
+       $info = (array) $info;
+       $info['required'] = $info['mandatory'];
+       unset($info['mandatory']);
+
+       $extra_info = unserialize($info['extra']);
+
+       if (isset($extra_info['webform_conditional_cid']) && !empty($extra_info['webform_conditional_cid'])) {
+         $conditional_value = $extra_info['webform_conditional_field_value'];
+         $conditional_operator = $extra_info['webform_conditional_operator'];
+         $conditional_cid = $extra_info['webform_conditional_cid'];
+         $conditional_arr = explode(PHP_EOL, $conditional_value);
+
+         $conditional_query = $this->getConnection('upgrade')->select('webform_component', 'wc');
+         $conditional_query->addField('wc', 'form_key');
+         $conditional_query->addField('wc', 'extra');
+         $conditional_query->condition('nid', $this->getNid(), '=');
+         $conditional_query->condition('cid', $conditional_cid, '=');
+         $conditional_info = $conditional_query->execute()->fetchAssoc();
+
+         $conditional_items = [];
+
+         if (!empty($conditional_info)) {
+           $conditional_extra_info = unserialize($conditional_info['extra']);
+           $conditional_options = explode(PHP_EOL, $conditional_extra_info['items']);
+           foreach ($conditional_options as $conditional_option) {
+             $element_arr = explode('|', $conditional_option);
+             if (in_array($element_arr[0], $conditional_arr)) {
+               $conditional_items[] = array(':input[name="' . $conditional_info['form_key'] . '"]' => ['value' => $element_arr[1]]);
+               // $conditional_items[$element_arr[0]] = $element_arr[1];
+               $conditional_items[] = 'xor';
+             }
+           }
+         }
+         if (!empty($conditional_items)) {
+           array_pop($conditional_items);
+           $info['#states']['visible'] = $conditional_items;
+         }
+       }
+
+       if ($info['form_key'] == 'organization') {
+         $info['required'] = '0';
+       }
+       if ($info['type'] == 'markup') {
+         $info['type'] = 'processed_text';
+       }
+       if ($info['type'] == 'select') {
+         // If aslist != 0, change field type to checkbox/radio.
+         if ($extra_info['aslist'] == 0) {
+           // Create options for checkboxes/radios.
+           $options = explode(PHP_EOL, $extra_info['items']);
+           $arrLength = count($options);
+
+           if ($extra_info['multiple'] == 1) {
+             if ($arrLength == 1) {
+               $info['type'] = 'checkbox';
+             }
+             else {
+               $info['type'] = 'checkboxes';
+             }
+           }
+           else {
+             $info['type'] = 'radios';
+           }
+         }
+       }
+
+       if ($info['form_key'] == 'designation' || $info['form_key'] == 'job_title') {
+         $info['type'] = 'select';
+       }
+
+       $array[] = ComponentFactory::instance()->create($this, $cid, $info, $this->options);
+     }
+
+     return new Components($array);
+   }
 
   /**
    * Get all the email handlers.
