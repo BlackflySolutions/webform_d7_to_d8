@@ -52,7 +52,8 @@ class Webform {
     $result = array_keys($query->execute()->fetchAllAssoc('sid'));
 
     $max = \Drupal::state()->get('webform_d7_to_d8_max_delete_items', 500);
-    $this->print('Will delete @n submissions in chunks of @c to avoid avoid out of memory errors.', ['@n' => count($result), '@c' => $max]);
+    $this->print('Will delete @n submissions in chunks of @c to avoid avoid
+      out of memory errors.', ['@n' => count($result), '@c' => $max]);
 
     $arrays = array_chunk($result, $max);
 
@@ -61,7 +62,8 @@ class Webform {
     $storage = \Drupal::entityTypeManager()->getStorage('webform_submission');
     foreach ($arrays as $array) {
       $submissions = WebformSubmission::loadMultiple($array);
-      $this->print('Deleting @n submissions for webform @f', ['@n' => count($submissions), '@f' => $this->getNid()]);
+      $this->print('Deleting @n submissions for webform @f',
+        ['@n' => count($submissions), '@f' => $this->getNid()]);
       $storage->delete($submissions);
     }
   }
@@ -102,7 +104,7 @@ class Webform {
    *
    * @throws \Exception
    */
-  public function process($options = []) {
+  public function process(array $options = []) {
     $new_only = empty($options['new-only']) ? FALSE : TRUE;
     $continue = TRUE;
     $this->drupalObject = $this->updateD8Webform([
@@ -119,7 +121,8 @@ class Webform {
     }
     $submissions = $this->webformSubmissions()->toArray();
     foreach ($submissions as $submission) {
-      $this->print($this->t('Form @n: Processing submission @s', ['@n' => $this->getNid(), '@s' => $submission->getSid()]));
+      $this->print($this->t('Form @n: Processing submission @s',
+        ['@n' => $this->getNid(), '@s' => $submission->getSid()]));
       try {
         $submission->process();
       }
@@ -189,7 +192,7 @@ class Webform {
   /**
    * Get all legacy components for a given webform.
    *
-   * @return Components
+   * @return \Drupal\webform_d7_to_d8\Collection\Components
    *   The components.
    *
    * @throws \Exception
@@ -291,7 +294,7 @@ class Webform {
       ]);
 
       $webform->setOriginalId($webform->id());
-       // Add handle to the webform, which triggers another save().
+      // Add handle to the webform, which triggers another save().
       $webform->addWebformHandler($webform_handler);
 
     }
@@ -302,6 +305,9 @@ class Webform {
    *
    * @param string $cid
    *   The cid value.
+   *
+   * @return string
+   *   Proper form key for email.
    */
   public function getEmailFormKey(string $cid) {
     $email = $this->getConnection('upgrade')->select('webform_component', 'wc');
@@ -318,6 +324,11 @@ class Webform {
    *
    * @param string $template
    *   The string containing token.
+   * @param string $type
+   *   The type of attribute of webform.
+   *
+   * @return string
+   *   Template body with updated tokens.
    */
   public function replaceToken(string $template, string $type = 'template') {
     $token_mapping = [
@@ -343,7 +354,7 @@ class Webform {
   /**
    * Get all legacy submissions for a given webform.
    *
-   * @return Submissions
+   * @return \Drupal\webform_d7_to_d8\Collection\Submissions
    *   The submissions.
    *
    * @throws \Exception
