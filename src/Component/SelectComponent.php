@@ -13,8 +13,10 @@ class SelectComponent extends Component {
    * {@inheritdoc}
    */
   public function extraInfo(&$array) {
-    $extra = unserialize($this->info['extra']);
-    $array['#options'] = $this->parseSelectOptions($extra['items']);
+    if ($this->info['form_key'] != 'designation' && $this->info['form_key'] != 'job_title') {
+      $extra = unserialize($this->info['extra']);
+      $array['#options'] = $this->parseSelectOptions($extra['items']);
+    }
   }
 
   /**

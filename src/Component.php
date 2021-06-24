@@ -51,6 +51,82 @@ class Component {
       '#title_display' => 'invisible',
     ];
 
+    $extra_info = unserialize($info['extra']);
+
+    if (isset($info['#states']['visible'])) {
+      $return['#states']['visible'] = $info['#states']['visible'];
+    }
+
+    if (isset($extra_info['webform_conditional_field_value']) && !empty($extra_info['webform_conditional_field_value'])) {
+      $conditional_value = $extra_info['webform_conditional_field_value'];
+    }
+    if (isset($extra_info['webform_conditional_operator']) && !empty($extra_info['webform_conditional_operator'])) {
+      $conditional_operator = $extra_info['webform_conditional_operator'];
+    }
+    if (isset($extra_info['webform_conditional_cid']) && !empty($extra_info['webform_conditional_cid'])) {
+      $conditional_cid = $extra_info['webform_conditional_cid'];
+    }
+    if (isset($extra_info['items']) && !empty($extra_info['items'])) {
+      $options = explode(PHP_EOL, $extra_info['items']);
+      $arrLength = count($options);
+      $option_array = array();
+      foreach ($options as $key => $option) {
+        $key_value = explode('|', $option);
+        $option_array[$key_value[0]] = $key_value[1];
+        if ($arrLength == 1) {
+          $checkbox_label = $key_value[1];
+        }
+      }
+    }
+
+    if (!empty($info['value']) && $info['type'] != 'processed_text') {
+      $info['value'] = str_replace("%first_name", "[current-user:field_first_name]", $info['value']);
+      $info['value'] = str_replace("%last_name", "[current-user:field_last_name]", $info['value']);
+      $info['value'] = str_replace("%phone", "[current-user:field_user_phone]", $info['value']);
+      $info['value'] = str_replace("%country", "[current-user:field_user_country]", $info['value']);
+      $info['value'] = str_replace("%organization", "[current-user:field_user_organization]", $info['value']);
+      $info['value'] = str_replace("%designation", "[current-user:field_user_designation]", $info['value']);
+      $return['#default_value'] = $info['value'];
+    }
+    switch ($info['type']) {
+      case 'email':
+        $return['#default_value'] = '[current-user:mail]';
+        $return['#placeholder'] = $info['name'] . '*';
+        break;
+      case 'textfield':
+        if ($info['required'] == '1') {
+          $return['#placeholder'] = $info['name'] . '*';
+        }
+        else {
+          $return['#placeholder'] = $info['name'];
+        }
+        break;
+      case 'select':
+        $return['#empty_option'] = $info['name'];
+        break;
+      case 'processed_text':
+        $return['#format'] = 'full_html';
+        $return['#text'] = $info['value'];
+        break;
+      case 'checkboxes':
+        $return['#options'] = $option_array;
+        $return['#description'] = $info['name'];
+        $return['#description_display'] = 'invisible';
+        unset($return['#title_display']);
+        break;
+      case 'checkbox':
+        $return['#description'] = $info['name'] = $checkbox_label;
+        $return['#description_display'] = 'invisible';
+        $return['#title_display'] = 'after';
+        break;
+      case 'radios':
+        $return['#description'] = $info['name'];
+        $return['#description_display'] = 'invisible';
+        $return['#options'] = $option_array;
+        $return['#title_display'] = 'before';
+        break;
+    }
+
     switch ($info['form_key']) {
       case 'utm_campaign':
         $return['#default_value'] = '[current-page:query:utm_campaign:clear]';
@@ -70,53 +146,17 @@ class Component {
       case 'privacy_policy':
         $return['#required_error'] = 'Privacy policy field is required.';
         break;
-    }
-    $extra_info = unserialize($info['extra']);
-    if (isset($extra_info['items']) && !empty($extra_info['items'])) {
-      $options = explode(PHP_EOL, $extra_info['items']);
-      $arrLength = count($options);
-      $option_array = array();
-      foreach ($options as $key => $option) {
-        $key_value = explode('|', $option);
-        $option_array[$key_value[0]] = $key_value[1];
-        if ($arrLength == 1) {
-          $checkbox_label = $key_value[1];
-        }
-      }
-    }
-
-    switch ($info['type']) {
-      case 'email':
-        $return['#default_value'] = '[current-user:mail]';
-        break;
-      case 'select':
-        $return['#empty_option'] = $info['name'];
-        break;
-      case 'hidden':
+      case 'actions':
         if (!empty($info['value'])) {
-          $return['#default_value'] = $info['value'];
+          $return['#submit__label'] = $info['value'];
+          break;
         }
-        break;
-      case 'processed_text':
-        $return['#format'] = 'full_html';
-        $return['#text'] = $info['value'];
-        break;
-      case 'checkboxes':
-        $return['description_display'] = $info['invisible'];
-        if (!empty($checkbox_label)) {
-          $info['description'] = $info['name'] = $checkbox_label;
-        }
-        break;
-      case 'checkbox':
-        $return['#description'] = $info['name'] = $checkbox_label;
-        $return['#description_display'] = $info['invisible'];
-        $return['#options'] = $option_array;
-        break;
-      case 'radios':
-        $return['#description'] = $info['name'];
-        $return['#description_display'] = $info['invisible'];
-        $return['#options'] = $option_array;
-        $return['#title_display'] = 'before';
+      case 'add_to_schedule':
+        $return['#title_display'] = 'none';
+        $return['#trim'] = true;
+        $return['#sanitize'] = true;
+        $return['#download'] = true;
+        $return['#url'] = '[webform_submission:add-to-schedule]';
         break;
     }
 
@@ -125,6 +165,9 @@ class Component {
 
     if ($info['form_key'] == 'gdpr_country') {
       $return['#options'] = 'country_codes';
+    }
+    if ($info['form_key'] == 'designation' || $info['form_key'] == 'job_title') {
+      $return['#options'] = 'designation';
     }
 
     return $return;

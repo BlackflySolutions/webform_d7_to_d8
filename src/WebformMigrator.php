@@ -277,6 +277,10 @@ class WebformMigrator {
       $query->condition('n.nid', $options['nid']);
       $this->print('Trying to find a legacy webform with nid @n', ['@n' => $options['nid']]);
     }
+    if (!empty($options['type'])) {
+      $query->condition('n.type', $options['type']);
+      $query->condition('n.status', 1);
+    }
     $result = $query->execute()->fetchAllAssoc('nid');
     $array = [];
     foreach ($result as $nid => $info) {
