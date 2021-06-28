@@ -111,6 +111,8 @@ class Webform {
       'id' => 'webform_' . $this->getNid(),
       'title' => $this->title,
     ], $options, $new_only, $continue);
+    // Update confirmation URL.
+    $this->setWebformConfirmation();
     if ($continue) {
       $components = $this->webformComponents();
       $this->print($this->t('Form @n: Processing components', ['@n' => $this->getNid()]));
@@ -319,6 +321,53 @@ class Webform {
 
      return new Components($array);
    }
+
+  /**
+   * Set confirmation URL in the webform.
+   */
+  protected function setWebformConfirmation() {
+    $query = $this->getConnection('upgrade')->select('webform', 'w')
+      ->fields('w', ['confirmation', 'redirect_url'])
+      ->condition('nid', $this->getNid());
+    $result = $query->execute()->fetchAssoc();
+    // Define standard confirmation type.
+    $confirmation_settings = [];
+    foreach ($result as $key => $value) {
+      switch ($key) {
+        case 'confirmation':
+          if ($value == '<confirmation>') {
+            // @TODO Update the confirmation URL here.
+            $value = '';
+          }
+          $confirmation_settings['confirmation_message'] = $value;
+          break;
+        case 'redirect_url':
+          $confirmation_settings['confirmation_url'] = $value;
+          break;
+      }
+    }
+    if ($confirmation_settings['confirmation_message'] && $confirmation_settings['confirmation_url'] == '<none>') {
+      $confirmation_settings['confirmation_type'] = 'message';
+    }
+    elseif ($confirmation_settings['confirmation_message'] && $confirmation_settings['confirmation_url']) {
+      $confirmation_settings['confirmation_type'] = 'url_message';
+    }
+    elseif (empty($confirmation_settings['confirmation_message']) && $confirmation_settings['confirmation_url']) {
+      $confirmation_settings['confirmation_type'] = 'url';
+    }
+    elseif ($confirmation_settings['confirmation_message'] && empty($confirmation_settings['confirmation_url'])) {
+      $confirmation_settings['confirmation_type'] = 'message';
+    }
+    else {
+      $confirmation_settings['confirmation_type'] = 'none';
+    }
+    // Updating form with confirmation properties.
+    $this->drupalObject = $this->updateD8Webform([
+      'id' => 'webform_' . $this->getNid(),
+      'title' => $this->title,
+      'settings' => $confirmation_settings,
+    ], [], FALSE);
+  }
 
   /**
    * Get all the email handlers.
