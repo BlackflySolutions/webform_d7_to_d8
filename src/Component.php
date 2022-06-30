@@ -46,7 +46,8 @@ class Component {
     $return = [
       '#title' => $info['name'],
       '#type' => $info['type'],
-      '#required' => $info['required'],
+      #'#required' => $info['required'],
+      '#required' => 0,
       '#default_value' => '',
       '#title_display' => 'invisible',
     ];

@@ -3,3 +3,5 @@ type: module
 description: 'Migrates Drupal 7 webforms to Drupal 8.'
 core_version_requirement: ^8 || ^9
 php: 7
+dependencies:
+ - webform_node

@@ -34,6 +34,8 @@ class Submission {
     $this->webform = $webform;
     $this->sid = $sid;
     $this->info = $info;
+    $this->uid = $info['uid'];
+    $this->remote_addr = $info['remote_addr'];
     $this->data = $data;
     $this->options = $options;
   }
@@ -86,6 +88,20 @@ class Submission {
   }
 
   /**
+   * Get the legacy user ID.
+   *
+   * @return int
+   *   The uid.
+   */
+  public function getUid() : int {
+    return $this->uid;
+  }
+
+  public function getRemoteAddress() {
+    return $this->remote_addr;
+  }
+
+  /**
    * Get the legacy webform nid.
    *
    * @return int
@@ -108,6 +124,7 @@ class Submission {
   public function process() : string {
     if ($this->alreadyProcessed()) {
       $this->print('Sid ' . $this->sid . ' for webform ' . $this->webform->getNid() . ' already processed; moving on...');
+      // auskommentieren, wenn alle Einträge nochmal migriert werden sollen (vorher die alten Einträge löschen, sonst wird gedoppelt)
       return 'already processed';
     }
 
@@ -117,11 +134,12 @@ class Submission {
       'entity_type' => NULL,
       'entity_id' => NULL,
       'in_draft' => FALSE,
-      'uid' => '1',
-      'langcode' => 'en',
+      'uid' => $this->getUid(),
+      'sid' => $this->getSid(),
+      'langcode' => 'de',
       'token' => 'pgmJREX2l4geg2RGFp0p78Qdfm1ksLxe6IlZ-mN9GZI',
       'uri' => '/webform/my_webform/api',
-      'remote_addr' => '',
+      'remote_addr' => $this->getRemoteAddress(),
       'data' => [],
     ];
     $this->fillDefaults();

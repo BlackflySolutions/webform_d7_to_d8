@@ -1,0 +1,11 @@
+{
+  "name": "webform/webform_d7_to_d8",
+  "description": "Migrates drupal7 webforms into drupal8 .",
+  "type": "drupal-custom-module",
+  "authors": [
+    {
+      "name": "",
+      "email": ""
+    }
+  ]
+}

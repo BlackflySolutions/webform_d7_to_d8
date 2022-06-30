@@ -226,7 +226,11 @@ class WebformMigrator {
     $query->orderBy('sid', 'DESC');
     $result = $query->execute()->fetchAllAssoc('sid');
     $keys = array_keys($result);
-    $last = array_pop($keys);
+    // array_pop schneidet letztes Element des Arrays ab und gibt als return zurück, daher war immer ein Element zu wenig den Webforsubmissions, wenn vorher eine Simulation lief
+    #$last = array_pop($keys);
+    #$last = end($keys);
+    // speichern der zuletzt ausgeführten sid kann dazu führen,
+    // dass gar keine Migration mehr ausgeführt wird, wenn mehrfach wiederholt migriert wird 
     $this->print('Keep track of latest imported submission id, @s, to not import the same submissions next time.', ['@s' => $last]);
     \Drupal::state()->set('webform_d7_to_d8', $last);
   }
@@ -253,6 +257,7 @@ class WebformMigrator {
       throw new \Exception('Did not get any results, this probably means you have no webforms on the legacy site, so this module will not do anything!');
     }
     $this->print('');
+    $this->print('Your database for the migration is @db', ['@db' => $this->getAllConnectionInfo()]);
     $keys = array_keys($result);
     $this->print('OK, got at least one result: @r', ['@r' => array_pop($keys)]);
     $this->print('');

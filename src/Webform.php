@@ -123,8 +123,7 @@ class Webform {
     }
     $submissions = $this->webformSubmissions()->toArray();
     foreach ($submissions as $submission) {
-      $this->print($this->t('Form @n: Processing submission @s',
-        ['@n' => $this->getNid(), '@s' => $submission->getSid()]));
+      $this->print($this->t('Form @n: Processing submission @s with user @u', ['@n' => $this->getNid(), '@s' => $submission->getSid(), '@u' => $submission->getUid()]));
       try {
         $submission->process();
       }
@@ -493,6 +492,8 @@ class Webform {
 
     $query = $this->getConnection('upgrade')->select('webform_submissions', 'ws');
     $query->addField('ws', 'sid');
+    $query->addField('ws', 'uid');
+    $query->addField('ws', 'remote_addr');
     $query->condition('nid', $this->getNid(), '=');
     $query->condition('sid', $this->firstSid(), '>');
 
