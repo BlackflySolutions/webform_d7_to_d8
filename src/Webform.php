@@ -193,7 +193,7 @@ class Webform {
   /**
    * Get all legacy components for a given webform.
    *
-   * @return \Drupal\webform_d7_to_d8\Collection\Components
+   * @return Components
    *   The components.
    *
    * @throws \Exception
@@ -474,7 +474,7 @@ class Webform {
   /**
    * Get all legacy submissions for a given webform.
    *
-   * @return \Drupal\webform_d7_to_d8\Collection\Submissions
+   * @return Submissions
    *   The submissions.
    *
    * @throws \Exception

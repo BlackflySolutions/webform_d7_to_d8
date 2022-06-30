@@ -71,7 +71,7 @@ trait Utilities {
   /**
    * Update D8 webform comonents; delete existing components and replace them.
    *
-   * @param Drupal\webform\Entity\Webform $webform
+   * @param Webform $webform
    *   A Drupal 8 webform object.
    * @param array $info
    *   Drupal 8 webform components as an array which should look like:
